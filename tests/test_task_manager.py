@@ -3,7 +3,9 @@ import os
 
 import pytest
 
-from task_manager import TaskManager, TaskStatus, TaskPriority
+from task_manager.models import TaskPriority, TaskStatus, get_priority, get_status
+from task_manager.repositories.repositories import JsonTaskRepository
+from task_manager.services import TaskService
 
 TEST_FILE = 'test_tasks.json'
 
@@ -22,12 +24,11 @@ def setup_module():
 
 @pytest.fixture
 def task_manager():
-    # Каждый тест получает новый экземпляр TaskManager
-    return TaskManager(TEST_FILE)
+    return TaskService(JsonTaskRepository(TEST_FILE))
 
 
 def test_load_from_empty_file():
-    empty_manager = TaskManager(TEST_FILE)
+    empty_manager = TaskService(JsonTaskRepository(TEST_FILE))
     assert len(empty_manager.tasks) == 0  # Ожидаем, что задачи не загружены
 
 
@@ -35,8 +36,7 @@ def test_load_tasks(task_manager):
     task_manager.add_task("Задача 1", "Описание 1", "Общие", "2023-12-31", TaskPriority.MEDIUM)
     task_manager.add_task("Задача 2", "Описание 2", "Общие", "2023-12-31", TaskPriority.LOW)
 
-    # Создаем новый экземпляр TaskManager для загрузки задач
-    new_manager = TaskManager(TEST_FILE)
+    new_manager = TaskService(JsonTaskRepository(TEST_FILE))
     assert len(new_manager.tasks) == 2
     assert new_manager.tasks[0].title == "Задача 1"
     assert new_manager.tasks[1].title == "Задача 2"
@@ -70,12 +70,12 @@ def test_search_tasks(task_manager):
 
 def test_get_priority_invalid():
     with pytest.raises(ValueError, match="Некорректный приоритет."):
-        TaskManager.get_priority("Неверный приоритет")
+        get_priority("Неверный приоритет")
 
 
 def test_get_status_invalid():
     with pytest.raises(ValueError, match="Некорректный статус: неверный статус"):
-        TaskManager.get_status("неверный статус")
+        get_status("неверный статус")
 
 
 def test_delete_nonexistent_task(task_manager):
@@ -101,7 +101,9 @@ def test_search_by_title(task_manager):
 
 def test_save_tasks_to_file(task_manager):
     task_manager.add_task("Задача для сохранения", "Описание", "Общие", "2023-12-31", TaskPriority.LOW)
-    task_manager.save_tasks()
+    task = task_manager.tasks
+    repository = JsonTaskRepository(TEST_FILE)
+    repository.save_tasks(task)
     with open(TEST_FILE, 'r', encoding='utf-8') as f:
         tasks = json.load(f)
     assert len(tasks) == 10
